@@ -3,84 +3,323 @@
     "id": null,
     "uid": "unas-storage",
     "title": "UNAS Pro 8 - Storage",
-    "tags": ["unas", "storage", "smart", "cache"],
+    "tags": ["unas", "storage", "smart", "btrfs", "nvme"],
     "timezone": "browser",
     "schemaVersion": 39,
     "refresh": "30s",
     "time": {"from": "now-1h", "to": "now"},
     "panels": [
       {
+        "id": 100,
+        "title": "NVMe Cache Tier & Pool Stats",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+        "collapsed": false
+      },
+      {
         "id": 1,
-        "title": "SSD Cache Hit Rate",
+        "title": "NVMe Tier I/O Share",
+        "description": "Percentage of total I/O handled by NVMe cache tier (md4)",
         "type": "gauge",
-        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
-        "targets": [{"expr": "100 * rate(dmcache_read_hits_total[5m]) / (rate(dmcache_read_hits_total[5m]) + rate(dmcache_read_misses_total[5m]))", "refId": "A"}],
-        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 30}, {"color": "green", "value": 70}]}}}
+        "gridPos": {"h": 5, "w": 4, "x": 0, "y": 1},
+        "targets": [{
+          "expr": "100 * sum(rate(node_disk_read_bytes_total{device=\"md4\",job=\"unas-node\"}[5m]) + rate(node_disk_written_bytes_total{device=\"md4\",job=\"unas-node\"}[5m])) / sum(rate(node_disk_read_bytes_total{device=~\"md.*\",job=\"unas-node\"}[5m]) + rate(node_disk_written_bytes_total{device=~\"md.*\",job=\"unas-node\"}[5m]))",
+          "refId": "A"
+        }],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {"steps": [{"color": "blue", "value": null}, {"color": "green", "value": 20}, {"color": "yellow", "value": 60}]}
+          }
+        }
       },
       {
         "id": 2,
-        "title": "SSD Cache Usage",
-        "type": "gauge",
-        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
-        "targets": [{"expr": "100 * dmcache_cache_used_blocks / dmcache_cache_total_blocks", "refId": "A"}],
-        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 80}, {"color": "red", "value": 95}]}}}
+        "title": "NVMe Tier Throughput",
+        "description": "Current read+write throughput on md4 (NVMe cache)",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 4, "x": 4, "y": 1},
+        "targets": [{
+          "expr": "sum(rate(node_disk_read_bytes_total{device=\"md4\",job=\"unas-node\"}[5m]) + rate(node_disk_written_bytes_total{device=\"md4\",job=\"unas-node\"}[5m]))",
+          "refId": "A"
+        }],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "Bps",
+            "thresholds": {"steps": [{"color": "green", "value": null}]}
+          }
+        },
+        "options": {"colorMode": "value", "graphMode": "area"}
       },
       {
         "id": 3,
-        "title": "Dirty Blocks",
+        "title": "NVMe Tier IOPS",
+        "description": "Operations per second on md4 (NVMe cache)",
         "type": "stat",
-        "gridPos": {"h": 6, "w": 4, "x": 12, "y": 0},
-        "targets": [{"expr": "dmcache_dirty_blocks", "refId": "A"}],
-        "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 10000}, {"color": "red", "value": 100000}]}}},
+        "gridPos": {"h": 5, "w": 4, "x": 8, "y": 1},
+        "targets": [{
+          "expr": "sum(rate(node_disk_reads_completed_total{device=\"md4\",job=\"unas-node\"}[5m]) + rate(node_disk_writes_completed_total{device=\"md4\",job=\"unas-node\"}[5m]))",
+          "refId": "A"
+        }],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "iops",
+            "thresholds": {"steps": [{"color": "green", "value": null}]}
+          }
+        },
+        "options": {"colorMode": "value", "graphMode": "area"}
+      },
+      {
+        "id": 15,
+        "title": "Pool % Used",
+        "type": "gauge",
+        "gridPos": {"h": 5, "w": 4, "x": 12, "y": 1},
+        "targets": [{"expr": "100 * (1 - max(node_filesystem_avail_bytes{mountpoint=~\"/volume/[^/]+$\",job=\"unas-node\"}) / max(node_filesystem_size_bytes{mountpoint=~\"/volume/[^/]+$\",job=\"unas-node\"}))", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 85}]}}}
+      },
+      {
+        "id": 13,
+        "title": "Pool Used",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 4, "x": 16, "y": 1},
+        "targets": [{"expr": "max(node_filesystem_size_bytes{mountpoint=~\"/volume/[^/]+$\",job=\"unas-node\"}) - max(node_filesystem_avail_bytes{mountpoint=~\"/volume/[^/]+$\",job=\"unas-node\"})", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "bytes"}},
+        "options": {"colorMode": "value", "graphMode": "area"}
+      },
+      {
+        "id": 14,
+        "title": "Pool Free",
+        "type": "stat",
+        "gridPos": {"h": 5, "w": 4, "x": 20, "y": 1},
+        "targets": [{"expr": "max(node_filesystem_avail_bytes{mountpoint=~\"/volume/[^/]+$\",job=\"unas-node\"})", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "bytes", "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 107374182400}, {"color": "green", "value": 536870912000}]}}},
         "options": {"colorMode": "value", "graphMode": "area"}
       },
       {
         "id": 4,
-        "title": "Cache Hit/Miss Rate",
+        "title": "Storage Tier I/O Comparison",
+        "description": "Throughput comparison: NVMe tier (md4) vs HDD tiers (md0/md3)",
         "type": "timeseries",
-        "gridPos": {"h": 7, "w": 12, "x": 0, "y": 6},
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 6},
         "targets": [
-          {"expr": "rate(dmcache_read_hits_total[5m])", "legendFormat": "Read Hits", "refId": "A"},
-          {"expr": "rate(dmcache_read_misses_total[5m])", "legendFormat": "Read Misses", "refId": "B"},
-          {"expr": "rate(dmcache_write_hits_total[5m])", "legendFormat": "Write Hits", "refId": "C"},
-          {"expr": "rate(dmcache_write_misses_total[5m])", "legendFormat": "Write Misses", "refId": "D"}
+          {"expr": "sum(rate(node_disk_read_bytes_total{device=\"md4\",job=\"unas-node\"}[5m]) + rate(node_disk_written_bytes_total{device=\"md4\",job=\"unas-node\"}[5m]))", "legendFormat": "NVMe Tier (md4)", "refId": "A"},
+          {"expr": "sum(rate(node_disk_read_bytes_total{device=~\"md[03]\",job=\"unas-node\"}[5m]) + rate(node_disk_written_bytes_total{device=~\"md[03]\",job=\"unas-node\"}[5m]))", "legendFormat": "HDD Tiers (md0+md3)", "refId": "B"}
         ],
-        "fieldConfig": {"defaults": {"unit": "ops", "custom": {"drawStyle": "line", "fillOpacity": 10}}}
+        "fieldConfig": {
+          "defaults": {
+            "unit": "Bps",
+            "custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 2}
+          },
+          "overrides": [
+            {"matcher": {"id": "byName", "options": "NVMe Tier (md4)"}, "properties": [{"id": "color", "value": {"fixedColor": "blue", "mode": "fixed"}}]},
+            {"matcher": {"id": "byName", "options": "HDD Tiers (md0+md3)"}, "properties": [{"id": "color", "value": {"fixedColor": "orange", "mode": "fixed"}}]}
+          ]
+        }
+      },
+      {
+        "id": 16,
+        "title": "Total Pool I/O Throughput",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 6},
+        "targets": [
+          {"expr": "sum(rate(node_disk_read_bytes_total{device=~\"md.*\",job=\"unas-node\"}[5m]))", "legendFormat": "Total Read", "refId": "A"},
+          {"expr": "-sum(rate(node_disk_written_bytes_total{device=~\"md.*\",job=\"unas-node\"}[5m]))", "legendFormat": "Total Write", "refId": "B"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "Bps", "custom": {"drawStyle": "line", "fillOpacity": 10}}}
+      },
+      {
+        "id": 101,
+        "title": "HDD Storage (md0/md3)",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 12},
+        "collapsed": false
       },
       {
         "id": 5,
-        "title": "Drive Temperatures",
+        "title": "HDD Temperatures",
+        "description": "Temperature per drive with trend sparkline",
         "type": "timeseries",
-        "gridPos": {"h": 7, "w": 12, "x": 12, "y": 6},
-        "targets": [{"expr": "smartctl_device_temperature{temperature_type=\"current\"}", "legendFormat": "{{device}}", "refId": "A"}],
-        "fieldConfig": {"defaults": {"unit": "celsius", "custom": {"drawStyle": "line", "fillOpacity": 0}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 45}, {"color": "red", "value": 55}]}}}
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 13},
+        "targets": [{"expr": "smartctl_device_temperature{temperature_type=\"current\",device=~\"sd.*\",job=\"unas-smart\"}", "legendFormat": "{{device}}", "refId": "A"}],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "celsius",
+            "min": 25,
+            "max": 55,
+            "custom": {"drawStyle": "line", "fillOpacity": 0, "lineWidth": 2, "pointSize": 3, "showPoints": "never"},
+            "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 40}, {"color": "orange", "value": 45}, {"color": "red", "value": 50}]},
+            "color": {"mode": "palette-classic"}
+          }
+        },
+        "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"]}}
       },
       {
         "id": 6,
         "title": "HDD Power-On Hours",
         "type": "bargauge",
-        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 13},
-        "targets": [{"expr": "smartctl_device_power_on_seconds{device=~\"sd.*\"} / 3600", "legendFormat": "{{device}}", "refId": "A"}],
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 13},
+        "targets": [{"expr": "smartctl_device_power_on_seconds{device=~\"sd.*\",job=\"unas-smart\"} / 3600", "legendFormat": "{{device}}", "refId": "A"}],
         "fieldConfig": {"defaults": {"unit": "h", "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 35000}, {"color": "red", "value": 50000}]}}},
-        "options": {"orientation": "horizontal", "displayMode": "gradient"}
+        "options": {"orientation": "horizontal", "displayMode": "gradient", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+      },
+      {
+        "id": 17,
+        "title": "HDD Reallocated Sectors",
+        "description": "Bad sectors remapped to spare area - increasing count indicates drive wear",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 13},
+        "targets": [{"expr": "smartctl_device_attribute{attribute_name=\"Reallocated_Sector_Ct\",attribute_value_type=\"raw\",device=~\"sd.*\",job=\"unas-smart\"}", "legendFormat": "{{device}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]}}},
+        "options": {"orientation": "horizontal", "displayMode": "gradient", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+      },
+      {
+        "id": 9,
+        "title": "HDD Read Latency",
+        "description": "Average read latency per drive - colored by severity",
+        "type": "state-timeline",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 21},
+        "targets": [{"expr": "rate(node_disk_read_time_seconds_total{device=~\"sd.*\",job=\"unas-node\"}[1m]) / rate(node_disk_reads_completed_total{device=~\"sd.*\",job=\"unas-node\"}[1m]) * 1000", "legendFormat": "{{device}}", "refId": "A"}],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 10}, {"color": "orange", "value": 20}, {"color": "red", "value": 50}]},
+            "custom": {"fillOpacity": 80}
+          }
+        },
+        "options": {"showValue": "auto", "alignValue": "center", "rowHeight": 0.8, "mergeValues": false}
+      },
+      {
+        "id": 10,
+        "title": "HDD Write Latency",
+        "description": "Average write latency per drive - colored by severity",
+        "type": "state-timeline",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 21},
+        "targets": [{"expr": "rate(node_disk_write_time_seconds_total{device=~\"sd.*\",job=\"unas-node\"}[1m]) / rate(node_disk_writes_completed_total{device=~\"sd.*\",job=\"unas-node\"}[1m]) * 1000", "legendFormat": "{{device}}", "refId": "A"}],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 10}, {"color": "orange", "value": 20}, {"color": "red", "value": 50}]},
+            "custom": {"fillOpacity": 80}
+          }
+        },
+        "options": {"showValue": "auto", "alignValue": "center", "rowHeight": 0.8, "mergeValues": false}
+      },
+      {
+        "id": 8,
+        "title": "HDD I/O Throughput",
+        "description": "Read/write throughput per drive",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 27},
+        "targets": [
+          {"expr": "rate(node_disk_read_bytes_total{device=~\"sd.*\",job=\"unas-node\"}[5m])", "legendFormat": "{{device}} read", "refId": "A"},
+          {"expr": "-rate(node_disk_written_bytes_total{device=~\"sd.*\",job=\"unas-node\"}[5m])", "legendFormat": "{{device}} write", "refId": "B"}
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "Bps",
+            "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "stacking": {"mode": "none"}},
+            "color": {"mode": "palette-classic"}
+          },
+          "overrides": [
+            {"matcher": {"id": "byRegexp", "options": ".* read"}, "properties": [{"id": "custom.fillOpacity", "value": 20}]},
+            {"matcher": {"id": "byRegexp", "options": ".* write"}, "properties": [{"id": "custom.fillOpacity", "value": 20}]}
+          ]
+        },
+        "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["mean", "max"]}}
+      },
+      {
+        "id": 102,
+        "title": "NVMe Storage (md4 Cache Tier)",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 35},
+        "collapsed": false
+      },
+      {
+        "id": 18,
+        "title": "NVMe Temperatures",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 36},
+        "targets": [{"expr": "smartctl_device_temperature{temperature_type=\"current\",device=~\"nvme.*\",job=\"unas-smart\"}", "legendFormat": "{{device}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "celsius", "custom": {"drawStyle": "line", "fillOpacity": 0}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 60}, {"color": "red", "value": 70}]}}}
       },
       {
         "id": 7,
         "title": "NVMe Wear Level",
         "type": "bargauge",
-        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 13},
-        "targets": [{"expr": "smartctl_device_percentage_used{device=~\"nvme.*\"}", "legendFormat": "{{device}}", "refId": "A"}],
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 36},
+        "targets": [{"expr": "smartctl_device_percentage_used{device=~\"nvme.*\",job=\"unas-smart\"}", "legendFormat": "{{device}}", "refId": "A"}],
         "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]}}},
         "options": {"orientation": "horizontal", "displayMode": "gradient"}
       },
       {
-        "id": 8,
-        "title": "Disk I/O",
+        "id": 19,
+        "title": "NVMe Available Spare",
+        "type": "bargauge",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 36},
+        "targets": [{"expr": "smartctl_device_available_spare{device=~\"nvme.*\",job=\"unas-smart\"}", "legendFormat": "{{device}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 20}, {"color": "green", "value": 50}]}}},
+        "options": {"orientation": "horizontal", "displayMode": "gradient"}
+      },
+      {
+        "id": 21,
+        "title": "NVMe Bytes Written (Lifetime)",
+        "description": "Total bytes written to NVMe - indicates cache write activity over device lifetime",
+        "type": "bargauge",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 42},
+        "targets": [{"expr": "smartctl_device_bytes_written{device=~\"nvme.*\",job=\"unas-smart\"}", "legendFormat": "{{device}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "bytes", "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 50000000000000}, {"color": "red", "value": 100000000000000}]}}},
+        "options": {"orientation": "horizontal", "displayMode": "gradient"}
+      },
+      {
+        "id": 22,
+        "title": "NVMe Bytes Read (Lifetime)",
+        "description": "Total bytes read from NVMe - indicates cache read activity over device lifetime",
+        "type": "bargauge",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 42},
+        "targets": [{"expr": "smartctl_device_bytes_read{device=~\"nvme.*\",job=\"unas-smart\"}", "legendFormat": "{{device}}", "refId": "A"}],
+        "fieldConfig": {"defaults": {"unit": "bytes", "thresholds": {"steps": [{"color": "green", "value": null}]}}},
+        "options": {"orientation": "horizontal", "displayMode": "gradient"}
+      },
+      {
+        "id": 11,
+        "title": "NVMe Read Latency",
+        "type": "state-timeline",
+        "gridPos": {"h": 4, "w": 12, "x": 0, "y": 48},
+        "targets": [{"expr": "rate(node_disk_read_time_seconds_total{device=~\"nvme.*\",job=\"unas-node\"}[1m]) / rate(node_disk_reads_completed_total{device=~\"nvme.*\",job=\"unas-node\"}[1m]) * 1000", "legendFormat": "{{device}}", "refId": "A"}],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "orange", "value": 5}, {"color": "red", "value": 10}]},
+            "custom": {"fillOpacity": 80}
+          }
+        },
+        "options": {"showValue": "auto", "alignValue": "center", "rowHeight": 0.8, "mergeValues": false}
+      },
+      {
+        "id": 12,
+        "title": "NVMe Write Latency",
+        "type": "state-timeline",
+        "gridPos": {"h": 4, "w": 12, "x": 12, "y": 48},
+        "targets": [{"expr": "rate(node_disk_write_time_seconds_total{device=~\"nvme.*\",job=\"unas-node\"}[1m]) / rate(node_disk_writes_completed_total{device=~\"nvme.*\",job=\"unas-node\"}[1m]) * 1000", "legendFormat": "{{device}}", "refId": "A"}],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "orange", "value": 5}, {"color": "red", "value": 10}]},
+            "custom": {"fillOpacity": 80}
+          }
+        },
+        "options": {"showValue": "auto", "alignValue": "center", "rowHeight": 0.8, "mergeValues": false}
+      },
+      {
+        "id": 20,
+        "title": "NVMe I/O Throughput",
         "type": "timeseries",
-        "gridPos": {"h": 7, "w": 24, "x": 0, "y": 19},
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 52},
         "targets": [
-          {"expr": "rate(node_disk_read_bytes_total{device=~\"sd.*|nvme.*\"}[5m])", "legendFormat": "{{device}} read", "refId": "A"},
-          {"expr": "-rate(node_disk_written_bytes_total{device=~\"sd.*|nvme.*\"}[5m])", "legendFormat": "{{device}} write", "refId": "B"}
+          {"expr": "rate(node_disk_read_bytes_total{device=~\"nvme.*\",job=\"unas-node\"}[5m])", "legendFormat": "{{device}} read", "refId": "A"},
+          {"expr": "-rate(node_disk_written_bytes_total{device=~\"nvme.*\",job=\"unas-node\"}[5m])", "legendFormat": "{{device}} write", "refId": "B"}
         ],
         "fieldConfig": {"defaults": {"unit": "Bps", "custom": {"drawStyle": "line", "fillOpacity": 10}}}
       }

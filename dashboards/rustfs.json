@@ -19,7 +19,7 @@
       },
       {
         "id": 2,
-        "title": "Request Latency",
+        "title": "Request Latency Percentiles",
         "type": "timeseries",
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
         "targets": [
@@ -30,10 +30,19 @@
         "fieldConfig": {"defaults": {"unit": "ms", "custom": {"drawStyle": "line", "fillOpacity": 10}}}
       },
       {
+        "id": 9,
+        "title": "Request Latency Heatmap",
+        "type": "heatmap",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+        "targets": [{"expr": "sum(increase(rustfs_rustfs_request_latency_ms_bucket[1m])) by (le)", "legendFormat": "{{le}}", "refId": "A", "format": "heatmap"}],
+        "fieldConfig": {"defaults": {"unit": "ms"}},
+        "options": {"calculate": true, "yAxis": {"unit": "ms"}, "color": {"scheme": "Spectral", "mode": "scheme", "reverse": true}, "cellGap": 1, "showValue": "never"}
+      },
+      {
         "id": 3,
         "title": "CPU Usage",
         "type": "gauge",
-        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 8},
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 16},
         "targets": [{"expr": "rustfs_process_cpu_usage_percent * 100", "refId": "A"}],
         "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 50}, {"color": "red", "value": 80}]}}}
       },
@@ -41,7 +50,7 @@
         "id": 4,
         "title": "Memory Usage",
         "type": "gauge",
-        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 8},
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 16},
         "targets": [{"expr": "rustfs_process_memory_usage_byte", "refId": "A"}],
         "fieldConfig": {"defaults": {"unit": "bytes", "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 536870912}, {"color": "red", "value": 1073741824}]}}}
       },
@@ -49,7 +58,7 @@
         "id": 5,
         "title": "Total Requests",
         "type": "stat",
-        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 8},
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 16},
         "targets": [{"expr": "sum(rustfs_rustfs_api_requests_total)", "refId": "A"}],
         "fieldConfig": {"defaults": {"unit": "short"}},
         "options": {"colorMode": "value", "graphMode": "area"}
@@ -58,7 +67,7 @@
         "id": 6,
         "title": "System Starts",
         "type": "stat",
-        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 8},
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 16},
         "targets": [{"expr": "rustfs_rustfs_audit_system_starts_total", "refId": "A"}],
         "fieldConfig": {"defaults": {"unit": "short"}},
         "options": {"colorMode": "value", "graphMode": "none"}
@@ -67,7 +76,7 @@
         "id": 7,
         "title": "Network I/O",
         "type": "timeseries",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22},
         "targets": [
           {"expr": "rate(rustfs_process_network_io_byte{direction=\"received\"}[5m])", "legendFormat": "Received", "refId": "A"},
           {"expr": "rate(rustfs_process_network_io_byte{direction=\"transmitted\"}[5m])", "legendFormat": "Transmitted", "refId": "B"}
@@ -78,7 +87,7 @@
         "id": 8,
         "title": "Requests by Endpoint",
         "type": "table",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22},
         "targets": [{"expr": "topk(10, sum by (key_request_method, key_request_uri_path) (rustfs_rustfs_api_requests_total))", "format": "table", "instant": true, "refId": "A"}],
         "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true, "job": true}, "renameByName": {"key_request_method": "Method", "key_request_uri_path": "Path", "Value": "Requests"}}}]
       }
