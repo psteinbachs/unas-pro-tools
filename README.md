@@ -49,6 +49,24 @@ All files are installed to `/persistent/` to survive firmware upgrades.
 - **UNAS Pro 8 - Storage**: SSD cache stats, drive health, RAID status
 - **RustFS**: S3 API metrics, request latency, throughput
 
+## Import Dashboards
+
+The `dashboards/` directory contains Grafana dashboards for monitoring.
+
+**Via Grafana UI:** Dashboards → Import → Upload JSON file
+
+- `unas-storage.json` - SSD cache stats, drive health, RAID status
+- `rustfs.json` - S3 API metrics, request latency, throughput
+
+**Via API:**
+```bash
+curl -u admin:password -X POST http://your-grafana:3000/api/dashboards/db \
+  -H "Content-Type: application/json" -d @dashboards/unas-storage.json
+
+curl -u admin:password -X POST http://your-grafana:3000/api/dashboards/db \
+  -H "Content-Type: application/json" -d @dashboards/rustfs.json
+```
+
 ## Post-Firmware Upgrade
 
 Run the restore script after any firmware upgrade:
