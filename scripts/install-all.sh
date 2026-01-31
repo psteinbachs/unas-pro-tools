@@ -3,7 +3,7 @@
 # Installs monitoring stack + RustFS
 set -e
 
-SCRIPT_URL="https://raw.githubusercontent.com/psteinbachs/oss/main/unas-pro-tools/scripts"
+SCRIPT_URL="https://raw.githubusercontent.com/psteinbachs/unas-pro-tools/main/scripts"
 
 echo "=== UNAS Pro Tools - Full Installation ==="
 echo ""

@@ -17,13 +17,13 @@ SSH into your UNAS Pro 8 and run:
 ### Monitoring Only
 
 ```bash
-curl -sL https://raw.githubusercontent.com/psteinbachs/oss/main/unas-pro-tools/scripts/install-monitoring.sh | bash
+curl -sL https://raw.githubusercontent.com/psteinbachs/unas-pro-tools/main/scripts/install-monitoring.sh | bash
 ```
 
 ### RustFS + Monitoring
 
 ```bash
-curl -sL https://raw.githubusercontent.com/psteinbachs/oss/main/unas-pro-tools/scripts/install-all.sh | bash
+curl -sL https://raw.githubusercontent.com/psteinbachs/unas-pro-tools/main/scripts/install-all.sh | bash
 ```
 
 ## What Gets Installed
