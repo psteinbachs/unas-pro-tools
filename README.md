@@ -31,11 +31,11 @@ curl -sL https://raw.githubusercontent.com/psteinbachs/unas-pro-tools/main/scrip
 All files are installed to `/persistent/` to survive firmware upgrades.
 
 ### Binaries (`/persistent/bin/`)
-- `node_exporter` - System metrics (CPU, memory, disk, network)
+- `node_exporter` - System metrics (CPU, memory, disk, network, btrfs)
 - `smartctl_exporter` - SMART drive health data
+- `dmcache-metrics.sh` - dm-cache stats collector (hit ratio, dirty blocks, promotions/demotions)
 - `otelcol-contrib` - OpenTelemetry collector (for RustFS metrics)
 - `rustfs` - S3-compatible object storage
-- `dmcache-metrics.sh` - dm-cache stats collector
 
 ### Services
 | Service | Port | Description |
@@ -46,7 +46,7 @@ All files are installed to `/persistent/` to survive firmware upgrades.
 | rustfs | 9000/9001 | S3 API / Web console |
 
 ### Grafana Dashboards
-- **UNAS Pro 8 - Storage**: SSD cache stats, drive health, RAID status
+- **UNAS Pro 8 - Storage**: dm-cache hit ratio, dirty blocks, HDD/NVMe health, pool stats
 - **RustFS**: S3 API metrics, request latency, throughput
 
 ## Import Dashboards
@@ -55,7 +55,7 @@ The `dashboards/` directory contains Grafana dashboards for monitoring.
 
 **Via Grafana UI:** Dashboards → Import → Upload JSON file
 
-- `unas-storage.json` - SSD cache stats, drive health, RAID status
+- `unas-storage.json` - dm-cache stats, HDD/NVMe health, btrfs pool stats
 - `rustfs.json` - S3 API metrics, request latency, throughput
 
 **Via API:**

@@ -45,50 +45,81 @@ rm -rf "smartctl_exporter-${SMARTCTL_EXPORTER_VERSION}.linux-${ARCH_SUFFIX}"*
 echo "Creating dm-cache metrics collector..."
 cat > "$PERSISTENT_BIN/dmcache-metrics.sh" << 'SCRIPT'
 #!/bin/bash
+# dm-cache metrics exporter for Prometheus node_exporter textfile collector
+set -euo pipefail
+
 OUTPUT_FILE="/persistent/textfile_collector/dmcache.prom"
-dmsetup status 2>/dev/null | while read line; do
-    if echo "$line" | grep -q " cache "; then
-        dev=$(echo "$line" | cut -d: -f1)
-        stats=$(echo "$line" | grep -oP "cache \K[0-9]+ [0-9]+/[0-9]+ [0-9]+ [0-9]+/[0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+")
-        if [ -n "$stats" ]; then
-            meta_used=$(echo "$stats" | awk '{split($2,a,"/"); print a[1]}')
-            meta_total=$(echo "$stats" | awk '{split($2,a,"/"); print a[2]}')
-            cache_used=$(echo "$stats" | awk '{split($4,a,"/"); print a[1]}')
-            cache_total=$(echo "$stats" | awk '{split($4,a,"/"); print a[2]}')
-            dirty=$(echo "$stats" | awk '{print $6}')
-            read_hits=$(echo "$stats" | awk '{print $7}')
-            read_misses=$(echo "$stats" | awk '{print $8}')
-            write_hits=$(echo "$stats" | awk '{print $9}')
-            write_misses=$(echo "$stats" | awk '{print $10}')
-            cat << METRICS
-# HELP dmcache_metadata_used_blocks Metadata blocks used
-# TYPE dmcache_metadata_used_blocks gauge
-dmcache_metadata_used_blocks{device="$dev"} $meta_used
-# HELP dmcache_cache_used_blocks Cache blocks used
+TEMP_FILE="${OUTPUT_FILE}.tmp"
+
+DMCACHE_OUTPUT=$(dmsetup status --target cache 2>/dev/null || true)
+
+if [[ -z "$DMCACHE_OUTPUT" ]]; then
+    echo "# No dm-cache devices found" > "$TEMP_FILE"
+    mv "$TEMP_FILE" "$OUTPUT_FILE"
+    exit 0
+fi
+
+cat > "$TEMP_FILE" << 'EOF'
+# HELP dmcache_cache_used_blocks Number of cache blocks in use
 # TYPE dmcache_cache_used_blocks gauge
-dmcache_cache_used_blocks{device="$dev"} $cache_used
-# HELP dmcache_cache_total_blocks Total cache blocks
+# HELP dmcache_cache_total_blocks Total number of cache blocks
 # TYPE dmcache_cache_total_blocks gauge
-dmcache_cache_total_blocks{device="$dev"} $cache_total
-# HELP dmcache_dirty_blocks Dirty blocks
-# TYPE dmcache_dirty_blocks gauge
-dmcache_dirty_blocks{device="$dev"} $dirty
-# HELP dmcache_read_hits_total Read hits
+# HELP dmcache_read_hits_total Total read hits
 # TYPE dmcache_read_hits_total counter
-dmcache_read_hits_total{device="$dev"} $read_hits
-# HELP dmcache_read_misses_total Read misses
+# HELP dmcache_read_misses_total Total read misses
 # TYPE dmcache_read_misses_total counter
-dmcache_read_misses_total{device="$dev"} $read_misses
-# HELP dmcache_write_hits_total Write hits
+# HELP dmcache_write_hits_total Total write hits
 # TYPE dmcache_write_hits_total counter
-dmcache_write_hits_total{device="$dev"} $write_hits
-# HELP dmcache_write_misses_total Write misses
+# HELP dmcache_write_misses_total Total write misses
 # TYPE dmcache_write_misses_total counter
-dmcache_write_misses_total{device="$dev"} $write_misses
-METRICS
-        fi
+# HELP dmcache_demotions_total Total demotions from cache
+# TYPE dmcache_demotions_total counter
+# HELP dmcache_promotions_total Total promotions to cache
+# TYPE dmcache_promotions_total counter
+# HELP dmcache_dirty_blocks Number of dirty blocks in cache
+# TYPE dmcache_dirty_blocks gauge
+# HELP dmcache_hit_ratio Cache hit ratio (0-1)
+# TYPE dmcache_hit_ratio gauge
+EOF
+
+echo "$DMCACHE_OUTPUT" | while IFS= read -r line; do
+    device=$(echo "$line" | cut -d: -f1)
+    fields=$(echo "$line" | cut -d: -f2-)
+
+    # dm-cache status format:
+    # start len cache meta_blk_sz used_meta/total_meta cache_blk_sz used_cache/total_cache
+    # read_hits read_misses write_hits write_misses demotions promotions dirty ...
+    read -r start length target_type meta_blk_sz meta_blocks cache_blk_sz cache_blocks \
+         read_hits read_misses write_hits write_misses demotions promotions dirty rest <<< "$fields"
+
+    [[ "$target_type" != "cache" ]] && continue
+
+    cache_used=$(echo "$cache_blocks" | cut -d/ -f1)
+    cache_total=$(echo "$cache_blocks" | cut -d/ -f2)
+
+    total_ops=$((read_hits + read_misses + write_hits + write_misses))
+    total_hits=$((read_hits + write_hits))
+    if [[ $total_ops -gt 0 ]]; then
+        hit_ratio=$(awk "BEGIN {printf \"%.6f\", $total_hits / $total_ops}")
+    else
+        hit_ratio="0"
     fi
-done > "$OUTPUT_FILE.tmp" && mv "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
+
+    cat >> "$TEMP_FILE" << METRICS
+dmcache_cache_used_blocks{device="$device"} $cache_used
+dmcache_cache_total_blocks{device="$device"} $cache_total
+dmcache_read_hits_total{device="$device"} $read_hits
+dmcache_read_misses_total{device="$device"} $read_misses
+dmcache_write_hits_total{device="$device"} $write_hits
+dmcache_write_misses_total{device="$device"} $write_misses
+dmcache_demotions_total{device="$device"} $demotions
+dmcache_promotions_total{device="$device"} $promotions
+dmcache_dirty_blocks{device="$device"} $dirty
+dmcache_hit_ratio{device="$device"} $hit_ratio
+METRICS
+done
+
+mv "$TEMP_FILE" "$OUTPUT_FILE"
 SCRIPT
 chmod +x "$PERSISTENT_BIN/dmcache-metrics.sh"
 
